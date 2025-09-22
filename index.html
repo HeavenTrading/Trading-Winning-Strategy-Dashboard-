@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trading Dashboard – Winning Trader Strategy based on Heaven Range-Time Box</title>
+  <style>
+    :root{
+      --bg:#0b1220; --card:#121a2b; --muted:#8aa0c9; --text:#e8f0ff; --accent:#55d6a9; --danger:#ff6b6b; --warn:#ffd166; --primary:#7aa2ff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,#0b1220 0%,#0f1830 100%);color:var(--text)}
+    .wrap{max-width:1100px;margin:26px auto;padding:0 16px}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+    header h1{font-size:clamp(22px,3vw,32px);margin:0}
+    header .badge{font-size:12px;padding:6px 10px;border-radius:999px;background:rgba(122,162,255,.12);color:var(--primary);border:1px solid rgba(122,162,255,.2)}
+    .card{background:radial-gradient(1200px 300px at 20% 0%,rgba(122,162,255,.06),transparent 50%),var(--card);border:1px solid rgba(255,255,255,.07);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .panel{padding:16px}
+    .grid{display:grid;gap:14px}
+    .cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    @media (max-width:900px){.cols-2,.cols-3{grid-template-columns:1fr}}
+    label{font-size:13px;color:var(--muted)}
+    input,select,button{font:inherit}
+    input[type="number"],input[type="text"],select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0f1830;color:var(--text);outline:none;transition:border-color .15s, box-shadow .15s}
+    .btn{padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#101a34;color:var(--text);cursor:pointer}
+    .btn.primary{background:linear-gradient(180deg,#6aa6ff,#4977ff);border-color:#4b79ff}
+    .btn.ghost{background:transparent}
+    .muted{color:var(--muted)}
+    .hr{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);margin:14px 0}
+    .kpi{padding:12px;border-radius:12px;background:#0e1730;border:1px solid rgba(255,255,255,.08)}
+    .kpi .v{font-size:18px;font-weight:700}
+    .row{display:flex;align-items:center;gap:10px}
+    .status{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.12)}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .ok{color:var(--accent)}
+    .bad{color:var(--danger)}
+    .warn{color:var(--warn)}
+    .note{font-size:12px;color:var(--muted)}
+    .clock{font-variant-numeric:tabular-nums}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    th,td{padding:10px 12px;border:1px solid rgba(255,255,255,.08);background:#0b132a}
+    th{background:#0f1830;color:#bcd0ff;text-align:left}
+    td:first-child,th:first-child{border-top-left-radius:8px;border-bottom-left-radius:8px}
+    td:last-child,th:last-child{border-top-right-radius:8px;border-bottom-right-radius:8px}
+    /* feedback vizual pentru selectul de sezon când este greșit */
+    .select-error{border-color:var(--danger)!important; box-shadow:0 0 0 3px rgba(255,107,107,.18)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>📊 Trading Dashboard – Winning Trader Strategy based on Heaven Range-Time Box</h1>
+      <span class="badge">XAUUSD · US30 · USDZAR · USDJPY</span>
+      <span class="muted" style="margin-left:auto">⚠️ Educational only – not financial advice.</span>
+    </header>
+
+    <div class="card panel">
+      <div class="row">
+        <div class="kpi">
+          <div class="row"><span class="muted">UTC time</span></div>
+          <div class="v clock" id="utcNow">—</div>
+        </div>
+        <div class="kpi">
+          <div class="row"><span class="muted">Broker server time(MarketWatch)</span></div>
+          <div class="v clock" id="brokerNow">—</div>
+        </div>
+        <div class="kpi">
+          <div class="row"><span class="muted">Status</span></div>
+          <div class="row">
+            <span class="status" id="status"><span class="dot" id="dot" style="background:#888"></span><b id="statusText">Idle</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="grid cols-3">
+        <div>
+          <label>Symbol</label>
+          <select id="symbol">
+            <option value="XAUUSD">XAUUSD (Gold)</option>
+            <option value="US30">US30 (Dow Jones)</option>
+            <option value="USDZAR">USDZAR</option>
+            <option value="USDJPY">USDJPY</option>
+          </select>
+        </div>
+        <div>
+          <label>Season <span id="seasonNote" class="note" style="margin-left:6px;"></span></label>
+          <select id="season">
+            <option value="standard">Standard (UTC)</option>
+            <option value="dst">Summer / DST</option>
+          </select>
+        </div>
+        <div>
+          <label>Broker offset vs UTC (hours) – e.g. +2, +3, -5</label>
+          <input id="offset" type="number" step="1" value="0"/>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="autofill">Autofill popular offsets</button>
+        <button class="btn primary" id="apply">Apply</button>
+        <span class="note">Set your broker's server offset exactly as shown in MT4 "Market Watch" vs UTC.</span>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="grid cols-2">
+        <div class="kpi">
+          <div class="row"><span class="muted">Hour A → Hour B (analysis window, UTC)</span></div>
+          <div class="v" id="abUTC">—</div>
+          <div class="note">From the method guide.</div>
+        </div>
+        <div class="kpi">
+          <div class="row"><span class="muted">Open → Close (order window, UTC)</span></div>
+          <div class="v" id="ocUTC">—</div>
+          <div class="note">Open = placement time; Close = daily cut-off.</div>
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="margin-top:8px">
+        <div class="kpi">
+          <div class="row"><span class="muted">Hour A → Hour B (broker time)</span></div>
+          <div class="v" id="abBRK">—</div>
+        </div>
+        <div class="kpi">
+          <div class="row"><span class="muted">Open → Close (broker time)</span></div>
+          <div class="v" id="ocBRK">—</div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="grid cols-2">
+        <div>
+          <table>
+            <thead><tr><th colspan="2">Avoid these periods</th></tr></thead>
+            <tbody>
+              <tr><td>Legal holidays / bank closures : </td><td>Low/liquidity anomalies</td></tr>
+              <tr><td>DST transition weeks (Mar / Oct) :</td><td>Desync London↔NY</td></tr>
+              <tr><td>Jun–Aug (summer month)   and </td><td>Dec 5 → ~Jan 5</td></tr>
+              <tr><td>High-impact news (e.g., NFP,CPI,FOMC,FED):</td><td>Possible slippage/spread spikes</td></tr>
+              <tr><td>Gold (XAUUSD) – Mondays :</td><td>Possible lower volatility in used window</td></tr>
+            </tbody>
+          </table>
+          <div class="note">These are recommendations derived from the strategy guide; always use your own discretion.</div>
+        </div>
+        <div>
+          <table>
+            <thead><tr><th colspan="2">Range sanity checks (avoid too small / too large)</th></tr></thead>
+            <tbody>
+              <tr><td>XAUUSD</td><td>Small &lt; $5–$6 · Large &gt; $20–$25</td></tr>
+              <tr><td>US30</td><td>Small &lt; $50–$60 · Large &gt; $200–$300</td></tr>
+              <tr><td>USDZAR</td><td>Small &lt; 0.02000 · Large &gt; 0.14000</td></tr>
+              <tr><td>USDJPY</td><td>Small &lt; 0.100 · Large &gt; 1.000</td></tr>
+            </tbody>
+          </table>
+          <div class="row" style="margin-top:8px;gap:8px"><label><input type="checkbox" id="avoidNow"> Treat today as an “avoid” day</label></div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="grid cols-3">
+        <div class="kpi">
+          <div class="row"><span class="muted">Next event (UTC)</span></div>
+          <div class="v" id="nextEvtUTC">—</div>
+          <div class="note">Countdown to Open/Close relative to UTC.</div>
+        </div>
+        <div class="kpi">
+          <div class="row"><span class="muted">Next event (broker)</span></div>
+          <div class="v" id="nextEvtBRK">—</div>
+        </div>
+        <div class="kpi">
+          <div class="row"><span class="muted">Countdown</span></div>
+          <div class="v" id="countdown">—</div>
+        </div>
+      </div>
+
+    </div>
+
+    <p class="note" style="margin-top:10px">Source rules are encoded from your Heaven Range-Time Box & EA guides. Configure the offset so that the broker times match your platform's Market Watch.</p>
+  </div>
+
+  <script>
+    const $ = (s)=>document.querySelector(s);
+    const pad = (n)=> String(n).padStart(2,'0');
+
+    // Strategy time rules in UTC (from the provided guides)
+    const RULES = {
+      XAUUSD: {
+        standard: { A:"00:00", B:"03:00", OPEN:"03:00", CLOSE:"13:00" },
+        dst:      { A:"23:00", B:"02:00", OPEN:"02:00", CLOSE:"12:00" }
+      },
+      US30:   {
+        standard: { A:"07:15", B:"11:10", OPEN:"11:10", CLOSE:"20:00" },
+        dst:      { A:"06:15", B:"10:10", OPEN:"10:10", CLOSE:"19:00" }
+      },
+      USDZAR: {
+        standard: { A:"08:10", B:"12:10", OPEN:"12:10", CLOSE:"21:00" },
+        dst:      { A:"07:10", B:"11:10", OPEN:"11:10", CLOSE:"20:00" }
+      },
+      USDJPY: {
+        standard: { A:"08:10", B:"12:10", OPEN:"12:10", CLOSE:"21:00" },
+        dst:      { A:"07:10", B:"11:10", OPEN:"11:10", CLOSE:"20:00" }
+      }
+    };
+
+    // ---- Automatic Season (DST) detection for Europe (EU DST) ----
+    function lastSundayUTC(year, monthIndex){
+      const d = new Date(Date.UTC(year, monthIndex + 1, 0, 1, 0, 0));
+      const dow = d.getUTCDay();
+      const back = (dow + 7) % 7;
+      d.setUTCDate(d.getUTCDate() - back);
+      return d;
+    }
+    function euDstRangeUTC(year){
+      const start = lastSundayUTC(year, 2);   // March
+      const end   = lastSundayUTC(year, 9);   // October
+      return {start, end};
+    }
+    function isInEuDST(dateUtc){
+      const y = dateUtc.getUTCFullYear();
+      let {start, end} = euDstRangeUTC(y);
+      if(dateUtc < start && dateUtc.getUTCMonth() < 2){
+        ({start, end} = euDstRangeUTC(y-1));
+      }
+      return dateUtc >= start && dateUtc < end;
+    }
+
+    // ——— FEEDBACK pentru Season (verde când e corect, roșu + avertisment când e greșit)
+    function updateSeasonFeedback(){
+      const now = new Date();
+      const inDst = isInEuDST(now);
+      const sel = $('#season');
+      const chosen = sel.value; // 'standard' | 'dst'
+      const {start, end} = euDstRangeUTC(
+        (now.getUTCMonth()===0 || now.getUTCMonth()===1) ? now.getUTCFullYear()-1 : now.getUTCFullYear()
+      );
+      const fmtDate = (d)=> d.toLocaleString(undefined,{month:'short', day:'2-digit', timeZone:'UTC'}) + ' ' + d.getUTCFullYear();
+
+      const noteEl = $('#seasonNote');
+      const nowTxt = inDst ? `Now: Summer / DST • ${fmtDate(start)} → ${fmtDate(end)}`
+                           : `Now: Standard UTC • ${fmtDate(end)} → ${fmtDate(euDstRangeUTC(end.getUTCFullYear()+1).start)}`;
+
+      // starea corectă/greșită
+      const correct = (inDst && chosen==='dst') || (!inDst && chosen==='standard');
+
+      if(correct){
+        noteEl.classList.remove('bad'); noteEl.classList.add('ok');
+        sel.classList.remove('select-error');
+        noteEl.textContent = `${nowTxt} • ✓ match`;
+        noteEl.title = 'Sezonul selectat corespunde perioadei curente.';
+      }else{
+        noteEl.classList.remove('ok'); noteEl.classList.add('bad');
+        sel.classList.add('select-error');
+        const needed = inDst ? 'Summer / DST' : 'Standard (UTC)';
+        noteEl.textContent = `${nowTxt} • ⚠(check)possible mismatch – select ${needed}`;
+        noteEl.title = 'Selecția nu corespunde perioadei actuale. Ajustează sezonul.';
+      }
+    }
+
+    function autoSelectSeason(){
+      const now = new Date();
+      const season = isInEuDST(now) ? 'dst' : 'standard';
+      $('#season').value = season;
+    }
+
+    // Auto-set offset from season (Standard→2, DST→3)
+    function setOffsetFromSeason(){
+      const season = $('#season').value;
+      $('#offset').value = (season === 'dst') ? 3 : 2;
+    }
+
+    function parseHM(hm){ const [h,m]=hm.split(':').map(Number); return {h,m}; }
+    function asDateUTC(hm){ const {h,m}=parseHM(hm); const d=new Date(); d.setUTCSeconds(0,0); d.setUTCHours(h,m,0,0); return d; }
+    function addHoursUTC(date, hours){ const d = new Date(date.getTime()); d.setUTCHours(d.getUTCHours()+hours); return d; }
+    function toBroker(date, offset){ return addHoursUTC(date, offset); }
+
+    function within(now, start, end){
+      const s = start.getUTCHours()*60 + start.getUTCMinutes();
+      const e = end.getUTCHours()*60 + end.getUTCMinutes();
+      const n = now.getUTCHours()*60 + now.getUTCMinutes();
+      if(s<=e) return n>=s && n<=e;
+      return n>=s || n<=e;
+    }
+    function nextEvent(now, open, close){
+      const inOpen = within(now, open, close);
+      if(inOpen){
+        return {label:'Close', ts: close};
+      } else {
+        const openToday = new Date(now);
+        openToday.setUTCHours(open.getUTCHours(), open.getUTCMinutes(),0,0);
+        let target = openToday;
+        const n = now.getUTCHours()*60 + now.getUTCMinutes();
+        const o = open.getUTCHours()*60 + open.getUTCMinutes();
+        if(n>=o && !within(now, open, close)) target = addHoursUTC(openToday, 24);
+        return {label:'Open', ts: target};
+      }
+    }
+    function hms(ms){ if(ms<0) ms=0; const s=Math.floor(ms/1000); const hh=pad(Math.floor(s/3600)); const mm=pad(Math.floor((s%3600)/60)); const ss=pad(s%60); return `${hh}:${mm}:${ss}`; }
+
+    function apply(){
+      const sym = $('#symbol').value;
+      const season = $('#season').value;
+      const offset = parseInt($('#offset').value||0,10);
+      const r = RULES[sym][season];
+
+      const A = asDateUTC(r.A), B = asDateUTC(r.B), OPEN = asDateUTC(r.OPEN), CLOSE = asDateUTC(r.CLOSE);
+
+      // UTC displays
+      $('#abUTC').textContent = `${r.A} → ${r.B} UTC`;
+      $('#ocUTC').textContent = `${r.OPEN} → ${r.CLOSE} UTC`;
+
+      // Broker time conversions
+      const A_b = toBroker(A, offset), B_b = toBroker(B, offset), OPEN_b = toBroker(OPEN, offset), CLOSE_b = toBroker(CLOSE, offset);
+      const p2 = (n)=>String(n).padStart(2,'0');
+      $('#abBRK').textContent = `${p2(A_b.getUTCHours())}:${p2(A_b.getUTCMinutes())} → ${p2(B_b.getUTCHours())}:${p2(B_b.getUTCMinutes())}`;
+      $('#ocBRK').textContent = `${p2(OPEN_b.getUTCHours())}:${p2(OPEN_b.getUTCMinutes())} → ${p2(CLOSE_b.getUTCHours())}:${p2(CLOSE_b.getUTCMinutes())}`;
+
+      window._sched = { sym, season, offset, A, B, OPEN, CLOSE, A_b, B_b, OPEN_b, CLOSE_b };
+      updateStatus();
+    }
+
+    function updateClocks(){
+      const now = new Date();
+      const p2 = (n)=>String(n).padStart(2,'0');
+      $('#utcNow').textContent = `${p2(now.getUTCHours())}:${p2(now.getUTCMinutes())}:${p2(now.getUTCSeconds())} UTC`;
+      const off = parseInt($('#offset').value||0,10);
+      const broker = new Date(now.getTime()+off*3600*1000);
+      $('#brokerNow').textContent = `${p2(broker.getUTCHours())}:${p2(broker.getUTCMinutes())}:${p2(broker.getUTCSeconds())}`;
+      updateStatus();
+    }
+
+    function updateStatus(){
+      const avoid = $('#avoidNow').checked;
+      const dot = $('#dot');
+      const txt = $('#statusText');
+      if(!window._sched){ dot.style.background='#888'; txt.textContent='Idle'; return; }
+      const now = new Date();
+      const inWindow = within(now, window._sched.OPEN, window._sched.CLOSE);
+      let color = '#888', label = 'Idle';
+      if(avoid){ color = '#ffd166'; label = 'Avoid (manual)'; }
+      else if(inWindow){ color = '#55d6a9'; label = 'Trading window OPEN'; }
+      else { color = '#ff6b6b'; label = 'Closed'; }
+      dot.style.background = color; txt.textContent = label;
+
+      const nxt = nextEvent(now, window._sched.OPEN, window._sched.CLOSE);
+      const p2 = (n)=>String(n).padStart(2,'0');
+      $('#nextEvtUTC').textContent = `${nxt.label} @ ${p2(nxt.ts.getUTCHours())}:${p2(nxt.ts.getUTCMinutes())} UTC`;
+      const nxtBrk = new Date(nxt.ts.getTime() + window._sched.offset*3600*1000);
+      $('#nextEvtBRK').textContent = `${nxt.label} @ ${p2(nxtBrk.getUTCHours())}:${p2(nxtBrk.getUTCMinutes())}`;
+      $('#countdown').textContent = hms(nxt.ts - now);
+    }
+
+    // Triggers automate
+    $('#season').addEventListener('change', ()=>{
+      setOffsetFromSeason();
+      updateSeasonFeedback();
+      apply();
+    });
+    $('#symbol').addEventListener('change', apply);
+    $('#offset').addEventListener('change', apply);
+    $('#offset').addEventListener('input', apply);
+
+    $('#autofill').addEventListener('click',()=>{
+      const season = $('#season').value;
+      $('#offset').value = (season==='dst') ? 3 : 2;
+      apply();
+    });
+    $('#apply').addEventListener('click', apply);
+
+    // Live clocks + refresh feedback periodic (în caz de trecere DST exact la 01:00 UTC)
+    setInterval(()=>{
+      updateClocks();
+      updateSeasonFeedback();
+    }, 1000);
+
+    // Inițializare
+    autoSelectSeason();
+    setOffsetFromSeason();
+    updateSeasonFeedback();
+    apply();
+  </script>
+</body>
+</html>
