@@ -121,11 +121,11 @@
 
       <div class="grid cols-2" style="margin-top:8px">
         <div class="kpi">
-          <div class="row"><span class="muted">Hour A → Hour B (broker time)</span></div>
+          <div class="row"><span class="muted">Hour A → Hour B (broker time)(Input EA)</span></div>
           <div class="v" id="abBRK">—</div>
         </div>
         <div class="kpi">
-          <div class="row"><span class="muted">Open → Close (broker time)</span></div>
+          <div class="row"><span class="muted">Open → Close (broker time)(Input EA)</span></div>
           <div class="v" id="ocBRK">—</div>
         </div>
       </div>
@@ -251,13 +251,13 @@
         noteEl.classList.remove('bad'); noteEl.classList.add('ok');
         sel.classList.remove('select-error');
         noteEl.textContent = `${nowTxt} • ✓ match`;
-        noteEl.title = 'Sezonul selectat corespunde perioadei curente.';
+        noteEl.title = 'The selected season corresponds to the current period.';
       }else{
         noteEl.classList.remove('ok'); noteEl.classList.add('bad');
         sel.classList.add('select-error');
         const needed = inDst ? 'Summer / DST' : 'Standard (UTC)';
         noteEl.textContent = `${nowTxt} • ⚠(check)possible mismatch – select ${needed}`;
-        noteEl.title = 'Selecția nu corespunde perioadei actuale. Ajustează sezonul.';
+        noteEl.title = 'The selection does not correspond to the current period. Adjust the season.';
       }
     }
 
